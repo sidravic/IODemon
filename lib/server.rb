@@ -20,7 +20,7 @@ module IODemon
 		private
 
 		def subscriber
-			@subscriber ||= IODemon::Subscriber.new(redis_subscriber)
+			@subscriber ||= IODemon::Subscriber.new(redis_subscriber, queue_redis)
 		end
 
 		def long_poller			
@@ -33,6 +33,10 @@ module IODemon
 
 		def redis_long_poller
 			@redis_long_poller ||= EM::Hiredis.connect
+		end
+
+		def queue_redis
+			@queue_redis ||= EM::Hiredis.connect
 		end
 	end
 	

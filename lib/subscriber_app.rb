@@ -1,11 +1,15 @@
 module IODemon
 	class Subscriber
 		include IODemon::Rack::Responses		
-		attr_accessor :subcription, :deferrable_response, :redis
+		attr_accessor :subcription, :deferrable_response, :redis, :queue_redis
 
-		def initialize(redis)
+		def initialize(redis, queue_redis)
 			@redis = redis
-			@deferrable_response = IODemon::DeferrableResponse.new
+			@queue_redis = queue_redis	
+			puts "&" * 50
+			puts "REDIS : #{@redis.object_id}"
+			puts "QUEUE_REDIS: #{@queue_redis.object_id}"
+			puts "&" * 50					
 		end
 
 		# env contains parameters
@@ -13,15 +17,17 @@ module IODemon
 		# Identifies and subscribes to the channel and returns a 202 accepted
 		# On successful subscription activate on message callbacks which should return a deferred respose Async.callback
 		def respond(env)
-			@env = env			
+			@env = env		
+			@deferrable_response = IODemon::DeferrableResponse.new	
 			request = ::Rack::Request.new(@env)			
 			channel = request.params["channel"]
-			puts "*" * 50
-			puts "Channel: #{channel}"
-			puts "*" * 50
+			# puts "*" * 50
+			# puts "Channel: #{channel}"
+			# puts "*" * 50
 			return IODemon::Rack::Responses::NOT_ACCEPTABLE unless channel.present?
 			unique_hash = IODemon::Hasher.hashify
 			subscribe(channel, unique_hash)
+			puts "== SENDING THROW ASYNC =="
 			throw :async
 			#generate_response(:accepted, unique_hash)
 		end
@@ -38,13 +44,17 @@ module IODemon
 				puts "Subscription to #{channel} successful"
 				EM.next_tick { 
 					puts "Sending async callback.."
-					#@env['async.callback'].call([200, {'Content-Type' => 'text/plain'}, @deferrable_response])
+					@env['async.callback'].call([200, {'Content-Type' => 'text/plain'}, @deferrable_response])
 				}
 				IODemon::Queue.new(channel, unique_hash, self)
 			}
 
 			@subscription.errback{|err| 
-				EM.next_tick { raise err }
+				puts "[ERROR] #{err}" 
+				EM.next_tick { 
+					puts "== Error Scenario :#{err.inspect} =="
+					raise err 
+				}
 			}
 
 			@redis.on(:message) do |channel, message|
