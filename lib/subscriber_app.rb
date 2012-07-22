@@ -35,8 +35,9 @@ module IODemon
 		private
 
 		def subscribe(channel = "/home", unique_hash)
-			channel_name = "#{channel}.#{unique_hash}"
-			@subscription = @redis.subscribe(channel_name)
+			#channel_name = "#{channel}.#{unique_hash}"
+			channel_name = "#{channel}.*"
+			@subscription = @redis.psubscribe(channel_name)
 
 			@subscription.callback{ |x|
 				#Success
@@ -44,7 +45,7 @@ module IODemon
 				puts "Subscription to #{channel} successful"
 				EM.next_tick { 
 					puts "Sending async callback.."
-					@env['async.callback'].call([200, {'Content-Type' => 'text/plain'}, @deferrable_response])
+					@env['async.callback'].call([200, {'Content-Type' => 'text/plain', 'Access-Control-Allow-Origin' => "*"}, @deferrable_response])
 				}
 				IODemon::Queue.new(channel, unique_hash, self)
 			}
@@ -57,10 +58,10 @@ module IODemon
 				}
 			}
 
-			@redis.on(:message) do |channel, message|
+			@redis.on(:pmessage) do |key, channel, message|
 				# On message 
 				# push the message into the appropriate queue
-				puts "#{channel}: #{message}"
+				puts "#{key} #{channel}: #{message}"
 			end
 		end
 	end

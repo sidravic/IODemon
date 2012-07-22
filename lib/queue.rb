@@ -4,7 +4,7 @@ module IODemon
 
 		QUEUE_MAX_LENGTH = 50
 
-		def initialize(channel, unique_hash, subscriber)			
+		def initialize(channel, unique_hash, subscriber =  nil)			
 			@channel_name = "#{channel}.#{unique_hash}"
 			@subscriber = subscriber
 			@unique_hash = unique_hash
@@ -14,7 +14,7 @@ module IODemon
 			# puts "channel_name: #{@channel_name.inspect}"
 			# puts "unique_hash: #{@unique_hash.inspect}"			
 			# puts "= " * 50
- 			create_queue
+ 			create_private_queue
 		end		
 
 		def add_message(message)			
@@ -28,12 +28,56 @@ module IODemon
 			end
 		end
 
-		def get_message
+		def self.get_messages(channel, hash, redis_connection, deferred_rack_response)		
+			message_array = []
+			channel_name = "#{channel}.#{hash}"
+			deferred_redis_response = redis_connection.llen(channel_name)
+			deferred_redis_response.callback {|len|
+				puts "Deferred Redis Response length: #{len}"
+				if len > 0 															
+					redis_connection.lrange(channel_name, 0, len -1).callback { |msgs|																		
+						msgs.each {|m| message_array << Marshal.load(m).to_json}					
+						0.upto(len -1) { 
+							redis_connection.lpop(channel_name).callback {|elem|
+								puts "Popped out read elements #{elem}"
+							}.errback{|err|
+								puts "[ERROR] #{err}"
+							}
+						}	
+						puts "Messages #{message_array.inspect}"
+						deferred_rack_response.append_message([message_array])	
+						deferred_rack_response.succeed
+						
+					}	
+				else					
+					deferred_redis_psubscription = redis_connection.psubscribe("#{channel}.*")
+					deferred_redis_psubscription.callback {
+						redis_connection.on(:pmessage) do |key, channel, message|
+							message = {:message => message, :timestamp => Time.now.utc}
+							message_array.push(message)
+							redis_connection.lpop.callback{|x|
+								puts "Popping list #{x}"
+							}							
+							puts "Sending message back #{message_array.inspect}"
+							deferred_rack_response.append_message([message_array.to_json])
+							deferred_rack_response.succeed
+							redis_connection.punsubscribe(channel_name).callback { |x|
+								puts "Redis Connection Disconnected. #{x}"
+							}
+						end
+					}
+
+					redis_connection.errback{ |err|
+						puts "[ERROR] #{err}"
+					}
+				end								
+			}
+
 		end
 
 		private
 
-		def create_queue
+		def create_private_queue
 			puts "= " * 50
 			puts "-- Inside the queue creator --"
 			puts "= " * 50 
