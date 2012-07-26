@@ -26,8 +26,10 @@ module IODemon
 			# puts "*" * 50
 			return IODemon::Rack::Responses::NOT_ACCEPTABLE unless channel.present?
 			unique_hash = IODemon::Hasher.hashify
-			subscribe(channel, unique_hash)
-			puts "== SENDING THROW ASYNC =="
+			EM.next_tick{
+				subscribe(channel, unique_hash)
+				puts "== SENDING THROW ASYNC =="
+			}
 			throw :async
 			#generate_response(:accepted, unique_hash)
 		end
@@ -35,22 +37,24 @@ module IODemon
 		private
 
 		def subscribe(channel = "/home", unique_hash)
-			#channel_name = "#{channel}.#{unique_hash}"
+			puts "In subscribe..."
+			EM.next_tick { 
+					puts "Sending async callback.."
+					@env['async.callback'].call([200, {'Content-Type' => 'text/plain', 'Access-Control-Allow-Origin' => "*"}, @deferrable_response])
+			}
+			
 			channel_name = "#{channel}.*"
-			@subscription = @redis.psubscribe(channel_name)
+			subscription = @redis.psubscribe(channel_name)
 
-			@subscription.callback{ |x|
+			subscription.callback{ |x|
 				#Success
 				# Create a new class. Create a message queue
 				puts "Subscription to #{channel} successful"
-				EM.next_tick { 
-					puts "Sending async callback.."
-					@env['async.callback'].call([200, {'Content-Type' => 'text/plain', 'Access-Control-Allow-Origin' => "*"}, @deferrable_response])
-				}
+				
 				IODemon::Queue.new(channel, unique_hash, self)
 			}
 
-			@subscription.errback{|err| 
+			subscription.errback{|err| 
 				puts "[ERROR] #{err}" 
 				EM.next_tick { 
 					puts "== Error Scenario :#{err.inspect} =="
@@ -61,7 +65,8 @@ module IODemon
 			@redis.on(:pmessage) do |key, channel, message|
 				# On message 
 				# push the message into the appropriate queue
-				puts "#{key} #{channel}: #{message}"
+				puts "[SUBSCRIBE]: #{key} #{channel}: #{message}"
+				IODemon::Queue.add_message("#{channel}.#{unique_hash}", message, queue_redis)
 			end
 		end
 	end

@@ -12,6 +12,8 @@ module IODemon
 				subscriber.respond(env)
 			when "/poll"
 				long_poller.respond(env)
+			when "/publish"
+				publisher.respond(env)
 			else
 				::Rack::Response.new("File Not Found", 404)
 			end				
@@ -24,7 +26,15 @@ module IODemon
 		end
 
 		def long_poller			
-			@long_poller ||= IODemon::LongPoller.new(redis_long_poller)
+			@long_poller ||= IODemon::LongPoller.new(redis_long_poller, poller_queue_redis)
+		end
+
+		def publisher
+			@publisher ||= IODemon::LongPoller.new(redis_publisher)
+		end
+
+		def redis_publisher
+			@redis_publisher ||= EM::Hiredis.connect
 		end
 
 		def redis_subscriber
@@ -37,6 +47,10 @@ module IODemon
 
 		def queue_redis
 			@queue_redis ||= EM::Hiredis.connect
+		end
+
+		def poller_queue_redis
+			@poller_queue_redis ||= EM::Hiredis.connect
 		end
 	end
 	
