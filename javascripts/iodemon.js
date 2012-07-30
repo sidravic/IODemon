@@ -11,7 +11,7 @@ IODemon = (function($, window, document, IOD){
 				}
 				else{
 					console.log('No in here');
-					window.setTimeout(self.callback, 3000);
+					window.setTimeout(self.callback,3000);
 				}
 		 			
 			},
@@ -23,7 +23,7 @@ IODemon = (function($, window, document, IOD){
 					type: 'GET',
 					dataType:'text',
 					success: function(resp){
-						console.log(resp)
+						$('body').append(resp)
 						if(resp){
 							IOD.LongPoll.demonChannel = channelName;
 							IOD.LongPoll.demonHash = resp;
@@ -47,7 +47,7 @@ IODemon = (function($, window, document, IOD){
 		 			type:'GET',
 		 			dataType:'text',
 		 			success:function(r){
-		 				console.log(r);
+		 				$('body').append("<p>" + r + "</p>");
 		 				console.log('success');
 		 				console.log(r);
 		 				console.log(self);

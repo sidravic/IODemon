@@ -62,11 +62,12 @@ module IODemon
 				}
 			}
 
-			@redis.on(:pmessage) do |key, channel, message|
+			@redis.on(:pmessage) do |key, c, message|
 				# On message 
 				# push the message into the appropriate queue
 				puts "[SUBSCRIBE]: #{key} #{channel}: #{message}"
-				IODemon::Queue.add_message("#{channel}.#{unique_hash}", message, queue_redis)
+				puts "USer unqiue hash is #{unique_hash}"
+				IODemon::Queue.add_message("#{channel}.#{unique_hash}", message, @queue_redis)
 			end
 		end
 	end
