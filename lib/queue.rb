@@ -63,7 +63,7 @@ module IODemon
 									puts "[ERROR] #{err}"
 								}
 
-								deferred_rack_response.append(message_array)
+								deferred_rack_response.append_message(message_array)
 								deferred_rack_response.succeed
 								periodic_timer.cancel
 							end
